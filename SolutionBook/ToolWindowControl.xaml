@@ -1,0 +1,334 @@
+﻿<!--
+    Copyright (C) 2020-2021 Pilotine / Stephane Gay / ZpqrtBnk
+
+    Licensed under the MIT License (https://opensource.org/licenses/MIT).
+    You may not use this file except in compliance with the License.
+-->
+
+<UserControl x:Class="SolutionBook.ToolWindowControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:SolutionBook"
+
+             xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:vsui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
+             xmlns:images="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.ImageCatalog"
+             xmlns:models="clr-namespace:SolutionBook.Models"
+
+             Background="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+             Foreground="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowTextBrushKey}}"
+
+             Name="_this"
+
+             mc:Ignorable="d"
+             d:DesignHeight="100" d:DesignWidth="800">
+
+    <UserControl.Resources>
+
+        <!-- tree item style -->
+        <Style x:Key="TreeViewItemStyle" TargetType="TreeViewItem">
+            <Setter Property="Padding" Value="1 2 1 2" />
+            <Setter Property="IsExpanded" Value="{Binding Path=IsExpanded, Mode=TwoWay}" />
+        </Style>
+
+        <!-- context menu style = switcher -->
+        <Style x:Key="ContextMenuSwitcher" TargetType="{x:Type StackPanel}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Type}" Value="{x:Static models:BookItemType.Solution}">
+                    <Setter Property="ContextMenu" Value="{DynamicResource SolutionContextMenu}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="{x:Static models:BookItemType.Folder}">
+                    <Setter Property="ContextMenu" Value="{DynamicResource FolderContextMenu}" />
+                </DataTrigger>
+                <!--
+                <DataTrigger Binding="{Binding Type}" Value="{x:Static local:BookItemType.Recents}">
+                    <Setter Property="ContextMenu" Value="{DynamicResource RecentsContextMenu}" />
+                </DataTrigger>
+                    -->
+                <DataTrigger Binding="{Binding Type}" Value="{x:Static models:BookItemType.RecentSolution}">
+                    <Setter Property="ContextMenu" Value="{DynamicResource RecentContextMenu}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ContextMenuStyle" TargetType="{x:Type ContextMenu}">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Background" Value="{DynamicResource {x:Static local:UiColors.ToolWindowBackground}}" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static local:UiColors.ToolWindowText}}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ContextMenu}">
+                        <Border BorderThickness="1" CornerRadius="4" BorderBrush="Black" x:Name="Border" Padding="1"
+                                Background="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowBackgroundBrushKey}}">
+                            <StackPanel ClipToBounds="True" Orientation="Vertical" IsItemsHost="True"
+                                        Background="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowBackgroundBrushKey}}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MenuItemStyle" TargetType="{x:Type MenuItem}">
+            <Setter Property="Background" Value="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowBackgroundBrushKey}}" />
+            <Setter Property="Margin" Value="0 2 0 2" />
+        </Style>
+
+        <Style x:Key="ToolBarButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Margin" Value="4,4,4,4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static local:UiColors.ToolWindowText}}" />
+            <!-- fixme hover color? -->
+        </Style>
+
+        <ContextMenu x:Key="SolutionContextMenu" Style="{DynamicResource ContextMenuStyle}">
+
+            <MenuItem Header="Open" Click="Menu_Open" Style="{DynamicResource MenuItemStyle}" IsEnabled="{Binding Path=(local:Solutions.CanOpen)}">
+                <MenuItem.Icon>
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Open}" />
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Rename" Click="Menu_Rename" Style="{DynamicResource MenuItemStyle}">
+                <MenuItem.Icon >
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Rename}" />
+                </MenuItem.Icon>
+            </MenuItem>
+            <!--
+            <MenuItem Header="Properties" Click="Menu_Properties" Style="{DynamicResource MenuItemStyle}">
+                <MenuItem.Icon>
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Property}" />
+                </MenuItem.Icon>
+            </MenuItem>
+            -->
+            <Separator />
+            <MenuItem Header="Remove" Click="Menu_RemoveSolution" Style="{DynamicResource MenuItemStyle}">
+                <MenuItem.Icon>
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Cancel}" />
+                </MenuItem.Icon>
+            </MenuItem>
+        </ContextMenu>
+
+        <ContextMenu x:Key="FolderContextMenu" Style="{DynamicResource ContextMenuStyle}">
+
+            <MenuItem Header="Rename" Click="Menu_Rename" Style="{DynamicResource MenuItemStyle}">
+                <MenuItem.Icon >
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Rename}" />
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Add Folder" Click="Menu_AddFolder" Style="{DynamicResource MenuItemStyle}">
+                <MenuItem.Icon>
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.AddFolder}" />
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Add Solution" Click="Menu_AddSolution" Style="{DynamicResource MenuItemStyle}">
+                <MenuItem.Icon>
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.AddScreen}" />
+                </MenuItem.Icon>
+            </MenuItem>
+            <Separator />
+            <MenuItem Header="Remove" Click="Menu_RemoveFolder" Style="{DynamicResource MenuItemStyle}">
+                <MenuItem.Icon>
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Cancel}" />
+                </MenuItem.Icon>
+            </MenuItem>
+        </ContextMenu>
+
+        <ContextMenu x:Key="RecentContextMenu" Style="{DynamicResource ContextMenuStyle}">
+
+            <MenuItem Header="Open" Click="Menu_Open" Style="{DynamicResource MenuItemStyle}" IsEnabled="{Binding Path=(local:Solutions.CanOpen)}">
+                <MenuItem.Icon>
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Open}" />
+                </MenuItem.Icon>
+            </MenuItem>
+        </ContextMenu>
+
+        <Style x:Key="TreeViewStyle" TargetType="{x:Type TreeView}">
+            <Setter Property="Background" Value="{DynamicResource {x:Static local:UiColors.ToolWindowBackground}}" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static local:UiColors.ToolWindowText}}" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style x:Key="ToolBarStyle" TargetType="{x:Type StackPanel}">
+            <Setter Property="Background" Value="{DynamicResource {x:Static local:UiColors.ToolBarBackground}}" />
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="DockPanel.Dock" Value="Top" />
+        </Style>
+
+        <Style x:Key="ToolBarSeparatorStyle" TargetType="{x:Type Separator}" BasedOn="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}">
+            <Setter Property="Background" Value="{DynamicResource {x:Static local:UiColors.ToolBarHover}}" />
+            <Setter Property="Margin" Value="2 4 2 4" />
+        </Style>
+
+        <Style x:Key="ToolBarButtonImageStyle" TargetType="{x:Type imaging:CrispImage}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Grayscale" Value="True" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!--
+            https://stackoverflow.com/questions/17259280/how-do-you-change-background-for-a-button-mouseover-in-wpf
+            (just to change the hover color...)
+        -->
+        <ControlTemplate x:Key="ToolBarButtonTemplate" TargetType="{x:Type ButtonBase}">
+            <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                <ContentPresenter x:Name="contentPresenter" ContentTemplate="{TemplateBinding ContentTemplate}" Content="{TemplateBinding Content}" ContentStringFormat="{TemplateBinding ContentStringFormat}" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="Button.IsDefaulted" Value="True">
+                    <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" TargetName="border" Value="{DynamicResource {x:Static local:UiColors.ToolBarHover}}"/> <!-- #FFBEE6FD -->
+                    <!-- <Setter Property="BorderBrush" TargetName="border" Value="#FF3C7FB1"/> -->
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" TargetName="border" Value="{DynamicResource {x:Static local:UiColors.ToolBarHover}}"/> <!-- #FFC4E5F6 -->
+                    <!-- <Setter Property="BorderBrush" TargetName="border" Value="#FF2C628B"/> -->
+                </Trigger>
+                <Trigger Property="ToggleButton.IsChecked" Value="True">
+                    <!--
+                    <Setter Property="Background" TargetName="border" Value="#FFBCDDEE"/>
+                    <Setter Property="BorderBrush" TargetName="border" Value="#FF245A83"/>
+                    -->
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <!--
+                    <Setter Property="Background" TargetName="border" Value="#FFF4F4F4"/>
+                    <Setter Property="BorderBrush" TargetName="border" Value="#FFADB2B5"/>
+                    <Setter Property="Foreground" Value="#FF838383"/>
+                    -->
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+    </UserControl.Resources>
+
+    <Grid>
+        <TextBlock Name="LoadingPanel" Text="..." VerticalAlignment="Center" HorizontalAlignment="Center" />
+        <DockPanel Name="ToolPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" LastChildFill="False" Visibility="Hidden">
+
+            <StackPanel Style="{DynamicResource ToolBarStyle}">
+                <StackPanel.Resources>
+                    <Style BasedOn="{StaticResource ToolBarButtonStyle}" TargetType="{x:Type Button}" />
+                </StackPanel.Resources>
+                <Button Name="Save" ToolTip="Save" Click="Save_Click" Template="{DynamicResource ToolBarButtonTemplate}" IsEnabled="False">
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Save}" Style="{DynamicResource ToolBarButtonImageStyle}"/>
+                </Button>
+                <Button Name="Refresh" ToolTip="Refresh" Click="Refresh_Click" Template="{DynamicResource ToolBarButtonTemplate}">
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.Refresh}" Style="{DynamicResource ToolBarButtonImageStyle}"/>
+                </Button>
+
+                <Separator Style="{DynamicResource ToolBarSeparatorStyle}" />
+
+                <Button Name="AddRootFolder" ToolTip="Add Root Folder" Click="AddRootFolder_Click" Template="{DynamicResource ToolBarButtonTemplate}">
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.AddFolder}" Style="{DynamicResource ToolBarButtonImageStyle}"/>
+                </Button>
+                <Button Name="AddRootSolution" ToolTip="Add Root Solution" Click="AddRootSolution_Click" Template="{DynamicResource ToolBarButtonTemplate}">
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.AddScreen}" Style="{DynamicResource ToolBarButtonImageStyle}"/>
+                </Button>
+
+                <Separator Style="{DynamicResource ToolBarSeparatorStyle}" />
+
+                <!-- ElementName=_this, Path=Solutions.CanOpen -->
+                <Button Name="OpenSolution" ToolTip="Open Solution" Click="OpenSolution_Click" Template="{DynamicResource ToolBarButtonTemplate}" IsEnabled="{Binding Solutions.CanOpen}">
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.OpenDocumentGroup}" Style="{DynamicResource ToolBarButtonImageStyle}"/>
+                </Button>
+                <Button Name="CloseSolution" ToolTip="Close Solution" Click="CloseSolution_Click" Template="{DynamicResource ToolBarButtonTemplate}" IsEnabled="{Binding Solutions.CanClose}">
+                    <imaging:CrispImage Moniker="{x:Static images:KnownMonikers.CloseSolution}" Style="{DynamicResource ToolBarButtonImageStyle}"/>
+                </Button>
+            </StackPanel>
+
+            <TreeView Height="Auto" Name="Book" VerticalAlignment="Stretch" DockPanel.Dock="Top"
+                      Style="{DynamicResource TreeViewStyle}"
+                      ItemContainerStyle="{StaticResource TreeViewItemStyle}"
+                      PreviewMouseLeftButtonDown="Book_PreviewMouseLeftDown"
+                      PreviewMouseRightButtonDown="Book_PreviewMouseRightDown"
+                      MouseDown="Book_MouseDown" MouseMove="Book_MouseMove"
+                      DragEnter="Book_CheckDrop" DragLeave="Book_CheckDrop" DragOver="Book_CheckDrop"
+                      Drop="Book_Drop"
+                      KeyUp="Book_KeyUp">
+
+                <TreeView.Resources>
+
+                    <!-- Style the inactive selection the same as active -->
+                    <SolidColorBrush
+                        x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}"
+                        Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
+                    <SolidColorBrush
+                        x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}"
+                        Color="{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"/>
+
+                    <!-- View template -->
+                    <DataTemplate x:Key="ViewTemplate">
+                        <StackPanel Orientation="Horizontal" Style="{StaticResource ContextMenuSwitcher}">
+                            <imaging:CrispImage Moniker="{Binding Icon}" Height="16" Width="16" Margin="0 0 4 0"/>
+                            <TextBlock Text="{Binding Header}" FontWeight="{Binding Weight}"
+                                       Foreground="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowTextBrushKey}}" />
+                        </StackPanel>
+                    </DataTemplate>
+
+                    <!-- Edit template -->
+                    <DataTemplate x:Key="EditTemplate">
+                        <StackPanel Orientation="Horizontal" Style="{StaticResource ContextMenuSwitcher}">
+                            <imaging:CrispImage Moniker="{Binding Icon}" Height="16" Width="16" Margin="0 0 4 0"/>
+                            <TextBox Text="{Binding Header}" FontWeight="{Binding Weight}"
+                                     Foreground="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowTextBrushKey}}"
+                                     Background="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+                                     Loaded="TextBox_Loaded"
+                                     LostFocus="TextBox_LostFocus" KeyUp="TextBox_KeyUp"  />
+                        </StackPanel>
+                    </DataTemplate>
+
+                    <!-- Presenter style = template selector -->
+                    <Style x:Key="PresenterStyle" TargetType="{x:Type ContentPresenter}">
+                        <Setter Property="ContentTemplate" Value="{StaticResource ViewTemplate}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                <Setter Property="ContentTemplate" Value="{StaticResource EditTemplate}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+
+                </TreeView.Resources>
+
+                <!-- container style -->
+                <!-- see TreeViewItemStyle
+                <TreeView.ItemContainerStyle>
+                    <Style TargetType="{x:Type TreeViewItem}">
+                        <Setter Property="IsExpanded" Value="{Binding Path=IsExpanded, Mode=TwoWay}" />
+                    </Style>
+                </TreeView.ItemContainerStyle>
+                -->
+
+                <!-- tree template -->
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate ItemsSource="{Binding Items}">
+                        <ContentPresenter Content="{Binding}" Style="{StaticResource PresenterStyle}" ToolTip="{Binding Path}"
+                                          MouseEnter="ContentPresenter_MouseEnter"
+                                          MouseLeave="ContentPresenter_MouseLeave"/>
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+
+            </TreeView>
+
+            <StatusBar Name="Infos2"
+                       DockPanel.Dock="Bottom"
+                       Background="Pink"
+                       Foreground="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowTextBrushKey}}"/>
+
+            <TextBlock Name="Infos" Text=""
+                       Height="16" Padding="4,0,4,0"
+                       DockPanel.Dock="Bottom"
+                       Background="Transparent"
+                       Foreground="{DynamicResource {x:Static vsui:EnvironmentColors.ToolWindowTextBrushKey}}" />
+
+        </DockPanel>
+    </Grid>
+</UserControl>
